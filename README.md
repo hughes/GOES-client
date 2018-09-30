@@ -1,5 +1,7 @@
 # GOES-client
 
+[DEMO](https://www.matthughes.info/goes-client/)
+
 Use with [GOES-server](https://github.com/hughes/GOES-server).
 
 ```
