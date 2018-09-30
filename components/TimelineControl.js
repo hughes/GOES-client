@@ -1,21 +1,15 @@
 import React from 'react';
 import {connect} from 'react-redux'
 import ReactInterval from 'react-interval';
-import { selectFrame } from '../store';
+import { selectFrame, toggleAutoplay } from '../store';
 
 class TimelineControl extends React.Component {
   constructor(props) {
     super(props)
-    this.state = {
-      autoIncrement: true,
-    }
   }
 
-  toggleAutoIncrement() {
-    this.setState({
-      ...this.state,
-      autoIncrement: !this.state.autoIncrement,
-    });
+  changeAutoplay() {
+    this.props.dispatch(toggleAutoplay());
   }
 
   changeFrameSlider(event) {
@@ -28,12 +22,17 @@ class TimelineControl extends React.Component {
   }
 
   increment() {
-    if(!this.state.autoIncrement) {
+    const {dispatch, frames, selectedFrameIndex, autoplay, loading} = this.props;
+    if(loading) {
+      // loading - do nothing
+      return;
+    }
+
+    if(!autoplay) {
       // no auto increment - do nothing
       return;
     }
 
-    const {dispatch, frames, selectedFrameIndex} = this.props;
     if(frames.length === 0) {
       // no frames - do nothing
       return;
@@ -55,8 +54,8 @@ class TimelineControl extends React.Component {
           Auto increment:
           <input
             type="checkbox"
-            checked={this.state.autoIncrement}
-            onChange={event => this.toggleAutoIncrement(event)} />
+            checked={this.props.autoplay}
+            onChange={event => this.changeAutoplay(event)} />
         </label>
         <input
           type="range"
@@ -65,7 +64,7 @@ class TimelineControl extends React.Component {
           value={this.props.selectedFrameIndex || 0}
           className="slider"
           id="timelineControl"
-          disabled={this.state.autoIncrement}
+          disabled={this.props.autoplay}
           onChange={event => this.changeFrameSlider(event)}
         />
       </div>
@@ -75,8 +74,8 @@ class TimelineControl extends React.Component {
 
 
 function mapStateToProps(state) {
-  const {selectedFrameIndex, frames} = state;
-  return {selectedFrameIndex, frames};
+  const {selectedFrameIndex, frames, autoplay, loading} = state;
+  return {selectedFrameIndex, frames, autoplay, loading};
 }
 
 export default connect(mapStateToProps)(TimelineControl)

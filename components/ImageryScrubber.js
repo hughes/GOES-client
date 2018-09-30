@@ -3,88 +3,155 @@ import api from '../api';
 import preloadImage from '../preloader';
 import Loader from '../loader';
 import {connect} from 'react-redux'
-import { selectFrame } from '../store';
+import { selectFrame, setLoading } from '../store';
+
+const LOADING_MESSAGE = 'Loading...';
 
 class ImageryScrubber extends React.Component {
   constructor(props) {
     super(props)
     this.loader = new Loader(),
     this.state = {
+      loadingCount: 0,
+      loadingComplete: 0,
       loadedImages: [],
-      count: 0,
-      width: 400,
-      height: 400,
-      loading: true,
+      width: 600,
+      height: 600,
     };
   }
 
-  async componentDidMount() {
-    // await this.loadImages();
+  componentDidMount() {
+    this.loadImages();
   }
 
   async loadImages() {
+    console.log('loading images');
+    this.props.dispatch(setLoading(true));
 
-    const loadedImages = await Promise.all(
-      this.props.images
-        .map(img => api.imageryPath(img.timestamp))
-        .map(path => preloadImage(path))
-    );
+    const {layers, frames} = this.props;
+
+    const enabledLayers = layers
+      .filter(layer => layer.enabled)
+      .map(layer => layer.key);
+
+    const timestamps = frames
+      .map(frame => frame.key);
+
+    const paths = api.generatePaths(timestamps, enabledLayers);
+    let loadingComplete = 0;
+
     this.setState({
       ...this.state,
-      loading: false,
+      loadingCount: paths.length,
+      loadingComplete: loadingComplete,
+    });
+
+    const loadedImages = await Promise.all(
+      paths.map(path => {
+        return preloadImage(path).then(img => {
+          loadingComplete += 1;
+          this.setState({
+            ...this.state,
+            loadingComplete,
+          });
+          return img;
+        });
+      })
+    );
+
+
+    this.setState({
+      ...this.state,
       loadedImages,
     })
-  }
 
-  rebuildImageList() {
-    console.log('rebuilding images');
+    this.props.dispatch(setLoading(false));
   }
 
   componentDidUpdate(prevProps) {
-    const changedLayer = this.props.layers.find((layer, index) => {
+    const {layers, selectedFrameIndex, frames} = this.props;
+
+    const changedLayer = layers.find((layer, index) => {
       const prevLayer = prevProps.layers[index];
       return layer.enabled !== prevLayer.enabled;
     });
-    if(changedLayer) {
-      this.rebuildImageList();
+
+    const changedFrames = frames.length !== prevProps.frames.length;
+
+    if(changedLayer || changedFrames) {
+      this.loadImages();
     }
 
     const ctx = this.refs.canvas.getContext('2d');
-    const img = this.state.loadedImages[this.state.count];
-    if(img) {
-      ctx.drawImage(img, 0, 0, this.state.width, this.state.height);
-    } else {
-      ctx.fillStyle = 'black';
-      ctx.fillRect(0, 0, this.state.width, this.state.height);
-    }
-    if(this.state.loading) {
-      const text = 'Loading...';
-      const x = 30, y = 60;
-      ctx.font = '30px Sans-serif';
-      ctx.strokeStyle = 'black';
-      ctx.lineWidth = 3;
-      ctx.strokeText(text, x, y);
-      ctx.fillStyle = 'white';
-      ctx.fillText(text, x, y);
-      ctx.fillStyle = 'black';
-      ctx.strokeStyle = 'white';
+    ctx.fillStyle = 'black';
+    ctx.fillRect(0, 0, this.state.width, this.state.height);
+
+    const enabledLayers = layers.filter(layer => layer.enabled);
+    const enabledLayerCount = enabledLayers.length;
+    ctx.globalCompositeOperation = 'source-over';
+    // ctx.globalCompositeOperation = 'screen';
+    enabledLayers.forEach((layer, i) => {
+      const img = this.state.loadedImages[selectedFrameIndex * enabledLayerCount + i];
+      if(img) {
+        ctx.drawImage(img, 0, 0, this.state.width, this.state.height);
+      }
+      ctx.globalCompositeOperation = 'screen';
+    });
+
+    ctx.globalCompositeOperation = 'source-over';
+
+    if(this.props.loading) {
+      this.drawLoadingMessage(ctx);
+      this.drawLoadingBar(ctx);
     }
   }
 
+  drawLoadingMessage(ctx) {
+    const x = 30, y = 60;
+    ctx.font = '30px Sans-serif';
+    ctx.fillStyle = 'black';
+    ctx.strokeStyle = 'black';
+    ctx.lineWidth = 3;
+    ctx.strokeText(LOADING_MESSAGE, x, y);
+    ctx.fillStyle = 'white';
+    ctx.fillText(LOADING_MESSAGE, x, y);
+  }
+
+  drawLoadingBar(ctx) {
+    const x = 30, y = 80;
+    ctx.font = '30px Sans-serif';
+    const textSize = ctx.measureText(LOADING_MESSAGE);
+    const progress = this.state.loadingComplete / this.state.loadingCount || 0;
+
+    ctx.strokeStyle = 'black';
+    ctx.fillStyle = 'black';
+    ctx.lineWidth = 7;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + textSize.width, y);
+    ctx.stroke();
+
+    ctx.strokeStyle = 'white';
+    ctx.fillStyle = 'white';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + textSize.width * progress, y);
+    ctx.stroke();
+  }
+
   render() {
-    const {count} = this.state;
     return (
       <div>
         <canvas ref="canvas" width={this.state.width} height={this.state.height}></canvas>
-        {/* <Imagery timestamp={this.props.images[count].timestamp}></Imagery> */}
       </div>
     );
   }
 }
 
 function mapStateToProps(state) {
-  const {layers, frames, selectedFrameIndex} = state;
-  return {layers, frames, selectedFrameIndex};
+  const {layers, frames, selectedFrameIndex, loading} = state;
+  return {layers, frames, selectedFrameIndex, loading};
 }
 
 export default connect(mapStateToProps)(ImageryScrubber)

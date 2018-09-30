@@ -11,11 +11,13 @@ class LayerSelection extends React.Component {
   render() {
     return (
       <form>
+        Layers:
         <ul>
           {this.props.layers.map(({key, enabled, name}, i) => (
             <li key={key}>
               {name}
               <input
+                disabled={this.props.loading}
                 type="checkbox"
                 name={i}
                 checked={enabled}
@@ -29,8 +31,8 @@ class LayerSelection extends React.Component {
 }
 
 function mapStateToProps(state) {
-  const { layers } = state;
-  return { layers };
+  const { layers, loading } = state;
+  return { layers, loading };
 }
 
 export default connect(mapStateToProps)(LayerSelection);

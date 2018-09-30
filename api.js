@@ -2,10 +2,20 @@ import fetch from 'isomorphic-unfetch'
 
 const DEFAULT_LAYER = 'geocolor';
 const DEFAULT_COLLECTION = 'goes-16---full_disk';
+const LAYERS = {
+  geocolor: 'Geocolor',
+  // white: 'Borders',  # todo: this one is different
+  natural_color: 'Natural Color (EUMETSAT)',
+  rgb_air_mass: 'RGB Air Mass (EUTMETSAT)',
+};
 
 class API {
   constructor() {
-    this.host = 'http://localhost:5000';
+    this.host = process.env.API_ENDPOINT;
+  }
+
+  get layers() {
+    return LAYERS
   }
 
   url(path) {
@@ -28,6 +38,14 @@ class API {
     const region = '00'
     const filename = '000_000.png'
     return this.url(`imagery/${dateStr}/${collection}/${layer}/${timestamp}/${region}/${filename}`);
+  }
+
+  generatePaths(timestamps, layers) {
+    const paths = [];
+    timestamps.forEach(timestamp => {
+      paths.push(...layers.map(layer => this.imageryPath(timestamp, layer)));
+    });
+    return paths;
   }
 }
 
